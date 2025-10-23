@@ -1,4 +1,5 @@
 //! Types related to task management
+use crate::config::MAX_SYSCALL_NUM;
 
 use super::TaskContext;
 
@@ -9,6 +10,8 @@ pub struct TaskControlBlock {
     pub task_status: TaskStatus,
     /// The task context
     pub task_cx: TaskContext,
+    /// The syscall count for each syscall
+    pub syscall_count: [usize; MAX_SYSCALL_NUM],
 }
 
 /// The status of a task

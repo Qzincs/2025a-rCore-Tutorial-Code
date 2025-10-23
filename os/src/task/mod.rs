@@ -14,7 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
@@ -54,6 +54,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_count: [0; MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +136,30 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// get the id of current `Running` task
+    fn get_current_task_id(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.current_task
+    }
+
+    /// get the syscall with syscall_id for the task with task_id
+    fn get_syscall_count(&self, task_id: usize, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[task_id].syscall_count[syscall_id]
+    }
+
+    /// increase the syscall count with syscall_id for the task with task_id
+    fn incr_syscall_count(&self, task_id: usize, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        inner.tasks[task_id].syscall_count[syscall_id] += 1;
+        // if task_id == 2 && syscall_id == 64 {
+        // println!(
+        //     "[kernel] incr_syscall_count: task_id = {}, syscall_id = {}, count = {}",
+        //     task_id, syscall_id, inner.tasks[task_id].syscall_count[syscall_id]
+        // );
+        // }
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +193,19 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// get the id of current `Running` task
+pub fn get_current_task_id() -> usize {
+    TASK_MANAGER.get_current_task_id()
+}
+
+/// get the syscall with syscall_id for the task with task_id
+pub fn get_syscall_count(task_id: usize, syscall_id: usize) -> usize {
+    TASK_MANAGER.get_syscall_count(task_id, syscall_id)
+}
+
+/// set the syscall count with syscall_id for the task with task_id
+pub fn incr_syscall_count(task_id: usize, syscall_id: usize) {
+    TASK_MANAGER.incr_syscall_count(task_id, syscall_id);
 }
